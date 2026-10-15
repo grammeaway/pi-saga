@@ -1,0 +1,28 @@
+{
+  "name": "@grammeaway/pi-saga",
+  "version": "0.1.0",
+  "description": "Sagas for the Pi agentic harness: /saga works through a directory of implementation plans, one fresh session and one commit per pass",
+  "type": "module",
+  "keywords": ["pi", "pi-extension", "pi-package", "loop", "plans", "agent-workflow"],
+  "license": "MIT",
+  "author": "Victor Gram Thomsen <victor@guramusoftware.com>",
+  "repository": { "type": "git", "url": "git+https://github.com/grammeaway/pi-saga" },
+  "bugs": { "url": "https://github.com/grammeaway/pi-saga/issues" },
+  "homepage": "https://github.com/grammeaway/pi-saga#readme",
+  "files": ["index.ts", "logic.ts", "skills", "README.md", "LICENSE"],
+  "pi": {
+    "extensions": ["./index.ts"],
+    "skills": ["./skills"]
+  },
+  "scripts": {
+    "test": "node --test test/*.test.ts"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "typebox": "*"
+  },
+  "devDependencies": {
+    "fast-check": "^4.3.0"
+  }
+}
