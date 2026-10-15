@@ -1,6 +1,6 @@
 {
   "name": "@grammeaway/pi-saga",
-  "version": "0.1.0",
+  "version": "1.0.1",
   "description": "Sagas for the Pi agentic harness: /saga works through a directory of implementation plans, one fresh session and one commit per pass",
   "type": "module",
   "keywords": ["pi", "pi-extension", "pi-package", "loop", "plans", "agent-workflow"],
