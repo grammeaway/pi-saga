@@ -38,18 +38,18 @@ The bundled `saga-plan` skill writes such a directory from any source document, 
 |---|---|
 | `/saga` | Pick a folder with a `progress.md` (a saga) and start it. Inside a paused pass session, resume that pass |
 | `/saga <dir> [max]` | Start or resume the saga in `<dir>`, at most `max` passes (default 20) |
-| `/saga stop` | Let the current pass finish and commit, then stop |
+| `/saga stop` | Let the current pass finish, then stop |
 
 If `<dir>` has no `prompt.md`, an editor opens with the first prompt of your latest session that mentioned the folder, and saves the result.
 
 ## A pass
 
-1. A new session (`saga: <dir> #N`) starts with `prompt.md`, plus a short note on how a pass ends.
+1. A new session (`saga: <dir> #N`) starts with `prompt.md`, plus a short note on how a pass ends. `N` counts on from the saga's earlier passes, across runs.
 2. The agent works. When it needs you, it asks and ends its turn; the loop waits until you've answered and the agent carries on.
-3. The agent stages its changes with `git add` and calls `saga_pass` with a commit message and a status: `next`, `complete` or `blocked` (with a reason).
-4. The loop commits exactly what is staged; unrelated files stay out. Then it starts the next pass, or stops.
+3. The agent commits its changes, leaving unrelated files out, and calls `saga_pass` with a status: `next`, `complete` or `blocked` (with a reason). Since the agent commits, the work lands even if the loop has already stopped.
+4. The loop starts the next pass, or stops.
 
-The loop stops on `complete`, `blocked`, Escape, an error, a failed commit, `/saga stop`, the pass limit, or two passes in a row that staged nothing. It always says why. After a Pi restart, resume the paused pass session and type `/saga`.
+The loop stops on `complete`, `blocked`, Escape, an error, `/saga stop`, the pass limit, or two passes in a row that committed nothing. It always says why. After a Pi restart, resume the paused pass session and type `/saga`.
 
 ## Notes
 

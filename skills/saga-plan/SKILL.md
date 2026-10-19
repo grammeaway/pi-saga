@@ -11,7 +11,7 @@ The directory:
 - `README.md`: the goal, the inputs, a **verdict** per source item, the plans in order with the reason for the order, and the shared rules.
 - `progress.md`: the live log. A Status table with one row per plan, then Decisions, Deviations and Found.
 - One file per plan.
-- `prompt.md`: the pass prompt `/saga` sends to every pass. The loop appends its own instructions for staging and reporting, so `prompt.md` stays about the work.
+- `prompt.md`: the pass prompt `/saga` sends to every pass. The loop appends its own instructions for committing and reporting, so `prompt.md` stays about the work.
 
 ## Steps
 

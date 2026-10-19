@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  decide, lastMarker, latestPromptFor, MARKER, parseArgs, passPrompt, readPass, sagaDirs, TOOL, type Loop,
+  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, sagaDirs, TOOL, type Loop,
 } from "../logic.ts";
 
 const loop = (over: Partial<Loop> = {}): Loop => ({ pass: 1, max: 20, noops: 0, stop: false, ...over });
@@ -23,8 +23,8 @@ test("parseArgs", () => {
 
 test("readPass takes the latest valid report and how the last response ended", () => {
   assert.deepEqual(readPass([]), { report: undefined, ended: "ok" });
-  const first = { status: "next", commit_message: "a" };
-  const second = { status: "complete", commit_message: "b" };
+  const first = { status: "next" };
+  const second = { status: "complete" };
   const p = readPass([report(first), assistant("toolUse"), report(second), report({ status: "bogus" }), report(first, true), assistant("stop")]);
   assert.deepEqual(p, { report: second, ended: "ok" });
   assert.equal(readPass([assistant("error"), assistant("stop")]).ended, "ok", "a retry that succeeded counts");
@@ -35,22 +35,29 @@ test("readPass takes the latest valid report and how the last response ended", (
 test("lastMarker", () => {
   const m = (data: unknown) => ({ type: "custom", customType: MARKER, data });
   assert.equal(lastMarker([]), undefined);
-  assert.deepEqual(lastMarker([m({ dir: "a", pass: 1 }), m({ dir: "b", pass: 2 }), m(null)]), { dir: "b", pass: 2 });
+  assert.deepEqual(lastMarker([m({ dir: "a", pass: 1 }), m({ dir: "b", pass: 2, head: "abc" }), m(null)]), { dir: "b", pass: 2, head: "abc" });
 });
 
 test("decide: the pass outcomes", () => {
-  const next = { status: "next" as const, commit_message: "m" };
+  const next = { status: "next" as const };
   assert.deepEqual(decide({ ended: "ok" }, false, loop()), { kind: "wait" });
   assert.equal(decide({ ended: "ok" }, false, loop({ stop: true })).kind, "stop");
-  assert.deepEqual(decide({ report: next, ended: "ok" }, true, loop()), { kind: "next", commit: true, noops: 0 });
-  assert.deepEqual(decide({ report: next, ended: "ok" }, false, loop()), { kind: "next", commit: false, noops: 1 });
+  assert.deepEqual(decide({ report: next, ended: "ok" }, true, loop()), { kind: "next", noops: 0 });
+  assert.deepEqual(decide({ report: next, ended: "ok" }, false, loop()), { kind: "next", noops: 1 });
   assert.equal(decide({ report: next, ended: "ok" }, false, loop({ noops: 1 })).kind, "stop");
   assert.deepEqual(decide({ report: next, ended: "aborted" }, true, loop()).kind, "stop");
-  assert.deepEqual(decide({ report: { status: "complete", commit_message: "m" }, ended: "ok" }, true, loop()), { kind: "stop", commit: true, why: "complete", done: true });
-  const blocked = decide({ report: { status: "blocked", commit_message: "m", reason: "needs a soak" }, ended: "ok" }, false, loop());
-  assert.deepEqual(blocked, { kind: "stop", commit: false, why: "blocked: needs a soak" });
-  assert.deepEqual(decide({ report: next, ended: "ok" }, true, loop({ pass: 3, max: 3 })), { kind: "stop", commit: true, why: "reached the limit of 3 passes" });
-  assert.deepEqual(decide({ report: next, ended: "ok" }, true, loop({ stop: true })), { kind: "stop", commit: true, why: "stopped by /saga stop" });
+  assert.deepEqual(decide({ report: { status: "complete" }, ended: "ok" }, true, loop()), { kind: "stop", why: "complete", done: true });
+  const blocked = decide({ report: { status: "blocked", reason: "needs a soak" }, ended: "ok" }, false, loop());
+  assert.deepEqual(blocked, { kind: "stop", why: "blocked: needs a soak" });
+  assert.deepEqual(decide({ report: next, ended: "ok" }, true, loop({ pass: 3, max: 3 })), { kind: "stop", why: "reached the pass limit (#3)" });
+  assert.deepEqual(decide({ report: next, ended: "ok" }, true, loop({ stop: true })), { kind: "stop", why: "stopped by /saga stop" });
+});
+
+test("nextPass carries on from the highest pass of the same saga", () => {
+  const s = (name?: string) => ({ name });
+  assert.equal(nextPass("plans", []), 1);
+  assert.equal(nextPass("plans", [s("saga: plans #3"), s("saga: plans #12"), s("saga: plans #1"), s(), s("other")]), 13);
+  assert.equal(nextPass("plans", [s("saga: plans/sub #9"), s("saga: other #4"), s("saga: plans #x")]), 1);
 });
 
 test("passPrompt keeps the prompt and appends the contract", () => {

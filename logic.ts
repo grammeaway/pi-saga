@@ -9,14 +9,15 @@ export const NOOP_LIMIT = 2;
 export const STATUSES = ["next", "complete", "blocked"] as const;
 
 export type Status = (typeof STATUSES)[number];
-export type Report = { status: Status; commit_message: string; reason?: string };
+export type Report = { status: Status; reason?: string };
 export type Ended = "ok" | "aborted" | "error";
 export type Pass = { report?: Report; ended: Ended };
 export type Loop = { pass: number; max: number; noops: number; stop: boolean };
 export type Step =
   | { kind: "wait" }
-  | { kind: "next"; commit: boolean; noops: number }
-  | { kind: "stop"; commit: boolean; why: string; done?: boolean };
+  | { kind: "next"; noops: number }
+  | { kind: "stop"; why: string; done?: boolean };
+export type Marker = { dir: string; pass: number; head?: string };
 
 export type Args = { stop: true } | { stop: false; dir?: string; max: number };
 
@@ -47,35 +48,43 @@ export function readPass(branch: readonly any[]): Pass {
   return { report, ended };
 }
 
-export function lastMarker(branch: readonly any[]): { dir: string; pass: number } | undefined {
+export function lastMarker(branch: readonly any[]): Marker | undefined {
   let marker;
   for (const e of branch)
     if (e?.type === "custom" && e.customType === MARKER && typeof e.data?.dir === "string") marker = e.data;
   return marker;
 }
 
-// What the loop does once the pass session is idle. `staged`: the index holds changes.
-export function decide(p: Pass, staged: boolean, loop: Loop): Step {
-  if (p.ended === "aborted") return { kind: "stop", commit: false, why: "the pass was interrupted" };
-  if (p.ended === "error") return { kind: "stop", commit: false, why: "the pass ended in an error" };
-  if (!p.report) return loop.stop ? { kind: "stop", commit: false, why: "stopped by /saga stop" } : { kind: "wait" };
+// What the loop does once the pass session is idle. `committed`: HEAD moved since the pass started.
+export function decide(p: Pass, committed: boolean, loop: Loop): Step {
+  if (p.ended === "aborted") return { kind: "stop", why: "the pass was interrupted" };
+  if (p.ended === "error") return { kind: "stop", why: "the pass ended in an error" };
+  if (!p.report) return loop.stop ? { kind: "stop", why: "stopped by /saga stop" } : { kind: "wait" };
 
-  const commit = staged;
-  if (p.report.status === "complete") return { kind: "stop", commit, why: "complete", done: true };
-  if (p.report.status === "blocked") return { kind: "stop", commit, why: `blocked: ${p.report.reason ?? "no reason given"}` };
-  const noops = staged ? 0 : loop.noops + 1;
-  if (noops >= NOOP_LIMIT) return { kind: "stop", commit, why: `${noops} passes in a row staged nothing` };
-  if (loop.stop) return { kind: "stop", commit, why: "stopped by /saga stop" };
-  if (loop.pass >= loop.max) return { kind: "stop", commit, why: `reached the limit of ${loop.max} passes` };
-  return { kind: "next", commit, noops };
+  if (p.report.status === "complete") return { kind: "stop", why: "complete", done: true };
+  if (p.report.status === "blocked") return { kind: "stop", why: `blocked: ${p.report.reason ?? "no reason given"}` };
+  const noops = committed ? 0 : loop.noops + 1;
+  if (noops >= NOOP_LIMIT) return { kind: "stop", why: `${noops} passes in a row committed nothing` };
+  if (loop.stop) return { kind: "stop", why: "stopped by /saga stop" };
+  if (loop.pass >= loop.max) return { kind: "stop", why: `reached the pass limit (#${loop.max})` };
+  return { kind: "next", noops };
+}
+
+export const sessionName = (dir: string, pass: number) => `saga: ${dir} #${pass}`;
+
+// Pass numbers carry on across runs of the same saga, so #N counts every pass it has had.
+export function nextPass(dir: string, sessions: readonly { name?: string }[]): number {
+  const prefix = sessionName(dir, 0).slice(0, -1);
+  const passes = sessions.map((s) => (s.name?.startsWith(prefix) ? Number(s.name.slice(prefix.length)) : 0));
+  return Math.max(0, ...passes.filter(Number.isInteger)) + 1;
 }
 
 const CONTRACT = "\n\n---\nThis is one pass of a saga over";
 
 export function passPrompt(prompt: string, dir: string): string {
   return `${prompt.trimEnd()}${CONTRACT} \`${dir}/\`. Each pass runs in a fresh session; the next starts after you report. When this pass's work is done:
-1. Stage exactly the changes that belong in this pass's commit (\`git add <paths>\`), and leave unrelated files unstaged. Don't commit: the loop commits what is staged.
-2. Call \`${TOOL}\` with a commit message in this repository's style (see \`git log\`).
+1. Commit exactly the changes that belong to this pass (\`git add <paths>\`, then \`git commit\`), with a message in this repository's style (see \`git log\`). Leave unrelated files out.
+2. Call \`${TOOL}\`.
 To ask the user something, ask and end your turn without calling \`${TOOL}\`. The loop waits for the answer.`;
 }
 
