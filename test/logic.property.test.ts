@@ -1,7 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
-import { decide, NOOP_LIMIT, STATUSES, type Ended, type Pass, type Status } from "../logic.ts";
+import {
+  decide, MARKER, NOOP_LIMIT, parseArgs, resumeCommand, sessionName, STATUSES, type Ended, type Pass, type Status,
+} from "../logic.ts";
 
 // One pass as the loop sees it once the session is idle; null report = the agent is waiting on the user.
 const passArb = fc.record({
@@ -18,6 +20,19 @@ test("the loop only waits on a quiet pass, and only goes on after a clean next",
       const step = decide({ report, ended: p.ended }, p.committed, { pass, max, noops: Math.min(noops, NOOP_LIMIT - 1), stop: p.stopAsked });
       if (step.kind === "wait") return assert.ok(!report && p.ended === "ok" && !p.stopAsked);
       if (step.kind === "next") assert.ok(report?.status === "next" && p.ended === "ok" && !p.stopAsked && pass < max);
+    }),
+  );
+});
+
+test("after a restart, the resumed run keeps the saga's pass limit", () => {
+  fc.assert(
+    fc.property(fc.integer({ min: 1, max: 100 }), fc.nat(50), fc.string({ minLength: 1 }), (pass, extra, dir) => {
+      const max = pass + extra;
+      const branch = [{ type: "custom", customType: MARKER, data: { dir, pass, max } }];
+      const sessions = Array.from({ length: pass }, (_, i) => ({ name: sessionName(dir, i + 1) }));
+      const args = parseArgs(resumeCommand(branch, sessions)!.replace(/^\/saga/, ""));
+      assert.ok(args && !args.stop && args.dir === undefined);
+      assert.equal(pass - 1 + args.max, max, "the /saga resume path computes max as pass - 1 + args.max");
     }),
   );
 });

@@ -17,7 +17,7 @@ export type Step =
   | { kind: "wait" }
   | { kind: "next"; noops: number }
   | { kind: "stop"; why: string; done?: boolean };
-export type Marker = { dir: string; pass: number; head?: string };
+export type Marker = { dir: string; pass: number; head?: string; max?: number };
 
 export type Args = { stop: true } | { stop: false; dir?: string; max: number };
 
@@ -53,6 +53,17 @@ export function lastMarker(branch: readonly any[]): Marker | undefined {
   for (const e of branch)
     if (e?.type === "custom" && e.customType === MARKER && typeof e.data?.dir === "string") marker = e.data;
   return marker;
+}
+
+// The /saga command that picks the loop back up when Pi reopens a pass session the loop never
+// finished with (Pi died mid-pass). Only the saga's latest pass, and only while nothing ended it:
+// no report yet, and no Escape or error.
+export function resumeCommand(branch: readonly any[], sessions: readonly { name?: string }[]): string | undefined {
+  const marker = lastMarker(branch);
+  if (!marker || nextPass(marker.dir, sessions) !== marker.pass + 1) return undefined;
+  const pass = readPass(branch);
+  if (pass.report || pass.ended !== "ok") return undefined;
+  return marker.max ? `/saga ${marker.max - marker.pass + 1}` : "/saga";
 }
 
 // What the loop does once the pass session is idle. `committed`: HEAD moved since the pass started.

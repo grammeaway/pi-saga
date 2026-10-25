@@ -49,7 +49,7 @@ If `<dir>` has no `prompt.md`, an editor opens with the first prompt of your lat
 3. The agent commits its changes, leaving unrelated files out, and calls `saga_pass` with a status: `next`, `complete` or `blocked` (with a reason). Since the agent commits, the work lands even if the loop has already stopped.
 4. The loop starts the next pass, or stops.
 
-The loop stops on `complete`, `blocked`, Escape, an error, `/saga stop`, the pass limit, or two passes in a row that committed nothing. It always says why. After a Pi restart, resume the paused pass session and type `/saga`.
+The loop stops on `complete`, `blocked`, Escape, an error, `/saga stop`, the pass limit, or two passes in a row that committed nothing. It always says why. If Pi dies mid-pass, reopening that pass session (`/resume`, `pi -c`) picks the loop back up on its own. A pass you stopped with Escape stays stopped.
 
 ## Notes
 

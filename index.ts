@@ -16,7 +16,7 @@ import { execFile } from "node:child_process";
 import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, sagaDirs,
+  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, resumeCommand, sagaDirs,
   sessionName, STATUSES, templatePrompt, TOOL, type Loop, type Marker, type Report,
 } from "./logic.ts";
 
@@ -63,8 +63,14 @@ export default function saga(pi: ExtensionAPI) {
 
   const activateTool = () => pi.setActiveTools([...new Set([...pi.getActiveTools(), TOOL])]);
 
-  pi.on("session_start", () => {
-    if (shared().run) activateTool();
+  pi.on("session_start", async (event, ctx) => {
+    if (shared().run) return activateTool();
+    if (event.reason !== "startup" && event.reason !== "resume") return;
+    if (!lastMarker(ctx.sessionManager.getBranch())) return;
+    const sessions = await SessionManager.list(ctx.cwd, ctx.sessionManager.getSessionDir()).catch(() => []);
+    const cmd = resumeCommand(ctx.sessionManager.getBranch(), sessions);
+    // Dispatched as a command: only command handlers get the ctx that can open the next pass's session.
+    if (cmd) pi.sendUserMessage(cmd, { expandPromptTemplates: true });
   });
 
   const finish = (run: Run, why: string, level: "info" | "warning" | "error") => {
@@ -109,7 +115,7 @@ export default function saga(pi: ExtensionAPI) {
   async function newPass(run: Run, ctx: any): Promise<void> {
     run.head = await head(run.cwd);
     const name = sessionName(run.dir, run.pass);
-    const marker: Marker = { dir: run.dir, pass: run.pass, head: run.head };
+    const marker: Marker = { dir: run.dir, pass: run.pass, head: run.head, max: run.max };
     const res = await ctx.newSession({
       setup: async (sm: any) => {
         sm.appendSessionInfo(name);

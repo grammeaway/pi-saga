@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, sagaDirs, TOOL, type Loop,
+  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, resumeCommand, sagaDirs, TOOL, type Loop,
 } from "../logic.ts";
 
 const loop = (over: Partial<Loop> = {}): Loop => ({ pass: 1, max: 20, noops: 0, stop: false, ...over });
@@ -36,6 +36,19 @@ test("lastMarker", () => {
   const m = (data: unknown) => ({ type: "custom", customType: MARKER, data });
   assert.equal(lastMarker([]), undefined);
   assert.deepEqual(lastMarker([m({ dir: "a", pass: 1 }), m({ dir: "b", pass: 2, head: "abc" }), m(null)]), { dir: "b", pass: 2, head: "abc" });
+});
+
+test("resumeCommand: only an unfinished latest pass picks the loop back up", () => {
+  const m = (data: unknown) => ({ type: "custom", customType: MARKER, data });
+  const sessions = [{ name: "saga: plans #1" }, { name: "saga: plans #2" }];
+  const pass2 = m({ dir: "plans", pass: 2, head: "abc", max: 5 });
+  assert.equal(resumeCommand([pass2, assistant("toolUse")], sessions), "/saga 4");
+  assert.equal(resumeCommand([m({ dir: "plans", pass: 2 })], sessions), "/saga", "markers from before max was stored");
+  assert.equal(resumeCommand([], sessions), undefined);
+  assert.equal(resumeCommand([m({ dir: "plans", pass: 1, max: 5 })], sessions), undefined, "an older pass");
+  assert.equal(resumeCommand([pass2, report({ status: "next" })], sessions), undefined, "already reported");
+  assert.equal(resumeCommand([pass2, assistant("aborted")], sessions), undefined, "stopped with Escape");
+  assert.equal(resumeCommand([pass2, assistant("error")], sessions), undefined);
 });
 
 test("decide: the pass outcomes", () => {
