@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import fc from "fast-check";
 import {
-  decide, MARKER, NOOP_LIMIT, parseArgs, resumeCommand, sessionName, STATUSES, type Ended, type Pass, type Status,
+  decide, MARKER, NOOP_LIMIT, parseArgs, planList, resumeCommand, sessionName, STATUSES, type Ended, type Pass, type Status,
 } from "../logic.ts";
 
 // One pass as the loop sees it once the session is idle; null report = the agent is waiting on the user.
@@ -57,5 +57,18 @@ test("a saga run always ends: within max passes, and never after NOOP_LIMIT empt
       }
     }),
     { numRuns: 2000 },
+  );
+});
+
+test("planList lists every plan once, in numeric order, whatever the zero-padding", () => {
+  const plan = fc.record({ n: fc.integer({ min: 1, max: 120 }), pad: fc.nat(2), name: fc.stringMatching(/^[a-z_]{1,8}$/) });
+  fc.assert(
+    fc.property(fc.uniqueArray(plan, { selector: (p) => p.n, maxLength: 20 }), (plans) => {
+      const files = plans.map((p) => `p${String(p.n).padStart(p.pad + 1, "0")}_${p.name}.md`);
+      const progress = plans.map((p) => `| p${p.n} ${p.name} | s${p.n} |`).join("\n");
+      const listed = planList([...files, "README.md", "progress.md"], progress).map((l) => l.split(/\s+/));
+      assert.deepEqual(listed.map(([f]) => f).sort(), [...files].sort());
+      assert.deepEqual(listed.map(([, s]) => s), plans.map((p) => p.n).sort((a, b) => a - b).map((n) => `s${n}`));
+    }),
   );
 });

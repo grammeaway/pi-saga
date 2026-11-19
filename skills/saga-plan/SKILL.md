@@ -10,7 +10,7 @@ The directory:
 
 - `README.md`: the goal, the inputs, a **verdict** per source item, the plans in order with the reason for the order, and the shared rules.
 - `progress.md`: the live log. A Status table with one row per plan, then Decisions, Deviations and Found.
-- One file per plan.
+- One file per plan, named `p<NN>_<name>.md` with a two-digit number (`p01_design.md`), so plans sort in order. `/saga ls` reads plans by this name and the Status table by the same `p<NN>`.
 - `prompt.md`: the pass prompt `/saga` sends to every pass. The loop appends its own instructions for committing and reporting, so `prompt.md` stays about the work.
 
 ## Steps

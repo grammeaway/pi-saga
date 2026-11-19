@@ -17,7 +17,7 @@ Skeletons for a saga directory, used when there is no style reference. Replace e
 
 | # | Source item | Verdict | Plan |
 |---|---|---|---|
-| 1 | Upload handler reads the whole file into memory | **Confirmed** (`upload.py:88`) | p2 |
+| 1 | Upload handler reads the whole file into memory | **Confirmed** (`upload.py:88`) | p02 |
 | 2 | Retry loop has no backoff | **Dropped:** the client library already backs off | — |
 
 ## Decisions
@@ -30,8 +30,8 @@ Skeletons for a saga directory, used when there is no style reference. Replace e
 
 | Order | Plan | What | Gate |
 |---|---|---|---|
-| 1 | [`p1_<name>.md`](p1_<name>.md) | <one line> | none |
-| 2 | [`p2_<name>.md`](p2_<name>.md) | <one line> | <benchmark, decision, ...> |
+| 1 | [`p01_<name>.md`](p01_<name>.md) | <one line> | none |
+| 2 | [`p02_<name>.md`](p02_<name>.md) | <one line> | <benchmark, decision, ...> |
 
 **Why this order:** <dependencies, fix before move, risk>.
 
@@ -52,8 +52,8 @@ Live log for `README.md`'s plans. One row per plan; details under Deviations and
 
 | Plan | Status | Base | Notes |
 |---|---|---|---|
-| p1 <name> | planned | | |
-| p2 <name> | planned | | |
+| p01 <name> | planned | | |
+| p02 <name> | planned | | |
 
 ## Decisions
 
@@ -71,7 +71,7 @@ Bugs or debts found during a pass and kept out of its diff.
 ## Plan file
 
 ```markdown
-# P2: Stream uploads
+# P02: Stream uploads
 
 ## Finding
 

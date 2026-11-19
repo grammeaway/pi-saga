@@ -28,7 +28,7 @@ A saga is a directory. `/saga` reads nothing else, so a saga can be resumed from
 | `README.md` | The plans, in order, and the rules they share |
 | `progress.md` | Which plans are done, plus decisions and deviations. The pass agent keeps it up to date |
 | `prompt.md` | The prompt every pass starts with, re-read before each pass. Edit it to change course mid-saga, e.g. to say how much you want to be asked |
-| one file per plan | What a pass implements |
+| `p<NN>_<name>.md` | One file per plan: what a pass implements. Two-digit numbers (`p01`, `p02`, ...) keep them in order |
 
 The bundled `saga-plan` skill writes such a directory from any source document, or amends an existing one: `/skill:saga-plan`.
 
@@ -39,6 +39,7 @@ The bundled `saga-plan` skill writes such a directory from any source document, 
 | `/saga` | Pick a folder with a `progress.md` (a saga) and start it. Inside a paused pass session, resume that pass |
 | `/saga <dir> [max]` | Start or resume the saga in `<dir>`, at most `max` passes (default 20) |
 | `/saga stop` | Let the current pass finish, then stop |
+| `/saga ls [dir]` | List the saga's plans in order, each with its status from `progress.md`. Without `<dir>`: the running saga, or pick one. Safe mid-pass: it doesn't touch the loop or the agent |
 
 If `<dir>` has no `prompt.md`, an editor opens with the first prompt of your latest session that mentioned the folder, and saves the result.
 

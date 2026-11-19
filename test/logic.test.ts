@@ -4,7 +4,7 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, resumeCommand, sagaDirs, TOOL, type Loop,
+  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, planList, readPass, resumeCommand, sagaDirs, TOOL, type Loop,
 } from "../logic.ts";
 
 const loop = (over: Partial<Loop> = {}): Loop => ({ pass: 1, max: 20, noops: 0, stop: false, ...over });
@@ -19,6 +19,9 @@ test("parseArgs", () => {
   assert.deepEqual(parseArgs("3"), { stop: false, dir: undefined, max: 3 });
   assert.equal(parseArgs("plans 0"), undefined);
   assert.equal(parseArgs("a b"), undefined);
+  assert.deepEqual(parseArgs("ls"), { stop: false, ls: true, dir: undefined });
+  assert.deepEqual(parseArgs("ls ./plans/"), { stop: false, ls: true, dir: "plans" });
+  assert.equal(parseArgs("ls a b"), undefined);
 });
 
 test("readPass takes the latest valid report and how the last response ended", () => {
@@ -96,4 +99,20 @@ test("sagaDirs lists folders with a progress.md, those with a prompt.md first", 
   }
   writeFileSync(join(root, "progress.md"), "");
   assert.deepEqual(sagaDirs(root), ["c", "a", "b"]);
+});
+
+test("planList orders plans by number and takes each status from progress.md", () => {
+  const files = ["p10_ci.md", "README.md", "p2_egress.md", "progress.md", "p01_design.md", "resources.md", "prompt.md", "p3_box.md"];
+  const progress = [
+    "## Status", "", "| Plan | Status | Base | Notes |", "|---|---|---|---|",
+    "| p1 design | done | abc | |", "| [p2](p2_egress.md) egress | in progress | | |", "| P10 ci | planned | | |",
+    "", "## Decisions", "", "| # | Decision |", "|---|---|", "| D3 | p3 is gated on DNS |",
+  ].join("\n");
+  assert.deepEqual(planList(files, progress), [
+    "p01_design.md  done",
+    "p2_egress.md   in progress",
+    "p3_box.md      ?",
+    "p10_ci.md      planned",
+  ]);
+  assert.deepEqual(planList(["README.md"], ""), []);
 });

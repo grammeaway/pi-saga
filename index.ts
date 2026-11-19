@@ -3,6 +3,7 @@
  *
  *   /saga [dir] [max]   start, or resume; without a dir, pick a folder that has a progress.md
  *   /saga stop          let the current pass finish, then stop
+ *   /saga ls [dir]      list the saga's plans with their status from progress.md
  *
  * The directory is the saga: README.md (the plans, in order), progress.md (what is
  * done) and prompt.md (the pass prompt, re-read every pass). A pass ends with the
@@ -13,10 +14,10 @@ import { SessionManager } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
 import { execFile } from "node:child_process";
-import { existsSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import {
-  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, readPass, resumeCommand, sagaDirs,
+  decide, lastMarker, latestPromptFor, MARKER, nextPass, parseArgs, passPrompt, planList, readPass, resumeCommand, sagaDirs,
   sessionName, STATUSES, templatePrompt, TOOL, type Loop, type Marker, type Report,
 } from "./logic.ts";
 
@@ -132,12 +133,28 @@ export default function saga(pi: ExtensionAPI) {
     launch().catch((err) => finish(run, `error: ${err?.message ?? err}`, "error"));
   };
 
+  async function pickSaga(ctx: any): Promise<string | undefined> {
+    const dirs = sagaDirs(ctx.cwd);
+    if (dirs.length === 0) return ctx.ui.notify("No folder here has a progress.md. Use /saga <dir>.", "warning");
+    return ctx.ui.select("Saga", dirs);
+  }
+
   pi.registerCommand("saga", {
-    description: "Work through a plan directory, one fresh session per pass. /saga [dir] [max] | /saga stop",
+    description: "Work through a plan directory, one fresh session per pass. /saga [dir] [max] | /saga stop | /saga ls [dir]",
     handler: async (raw, ctx) => {
       const args = parseArgs(raw);
-      if (!args) return ctx.ui.notify("Usage: /saga [dir] [max-passes] | /saga stop", "warning");
+      if (!args) return ctx.ui.notify("Usage: /saga [dir] [max-passes] | /saga stop | /saga ls [dir]", "warning");
       const running = shared().run;
+
+      if ("ls" in args) {
+        const dir = args.dir ?? running?.dir ?? lastMarker(ctx.sessionManager.getBranch())?.dir ?? (await pickSaga(ctx));
+        if (!dir) return;
+        const path = join(ctx.cwd, dir);
+        if (!existsSync(path) || !statSync(path).isDirectory()) return ctx.ui.notify(`No directory ${dir}.`, "error");
+        const progress = existsSync(join(path, "progress.md")) ? readFileSync(join(path, "progress.md"), "utf8") : "";
+        const lines = planList(readdirSync(path), progress);
+        return ctx.ui.notify(lines.length ? `${dir}:\n${lines.join("\n")}` : `No plan files (p<N>_*.md) in ${dir}.`, "info");
+      }
 
       if (args.stop) {
         if (!running) return ctx.ui.notify("No saga is running.", "warning");
@@ -161,13 +178,8 @@ export default function saga(pi: ExtensionAPI) {
         return start(run, () => runPass(run, ctx, false));
       }
 
-      let dir = args.dir;
-      if (!dir) {
-        const dirs = sagaDirs(ctx.cwd);
-        if (dirs.length === 0) return ctx.ui.notify("No folder here has a progress.md. Use /saga <dir>.", "warning");
-        dir = await ctx.ui.select("Saga", dirs);
-        if (!dir) return;
-      }
+      const dir = args.dir ?? (await pickSaga(ctx));
+      if (!dir) return;
       if (!existsSync(join(ctx.cwd, dir)) || !statSync(join(ctx.cwd, dir)).isDirectory())
         return ctx.ui.notify(`No directory ${dir}.`, "error");
 

@@ -19,11 +19,12 @@ export type Step =
   | { kind: "stop"; why: string; done?: boolean };
 export type Marker = { dir: string; pass: number; head?: string; max?: number };
 
-export type Args = { stop: true } | { stop: false; dir?: string; max: number };
+export type Args = { stop: true } | { stop: false; ls: true; dir?: string } | { stop: false; dir?: string; max: number };
 
 export function parseArgs(raw: string): Args | undefined {
   const words = raw.trim().split(/\s+/).filter(Boolean);
   if (words.length === 1 && words[0] === "stop") return { stop: true };
+  if (words[0] === "ls" && words.length <= 2) return { stop: false, ls: true, dir: words[1] && normalizeDir(words[1]) };
   let max = DEFAULT_MAX;
   if (words.length > 0 && /^\d+$/.test(words[words.length - 1])) {
     max = Number(words.pop());
@@ -112,6 +113,21 @@ export function latestPromptFor(dir: string, sessions: readonly { firstMessage: 
     .filter((s) => s.firstMessage.includes(name))
     .sort((a, b) => b.modified.getTime() - a.modified.getTime())[0]
     ?.firstMessage.split(CONTRACT)[0];
+}
+
+const planNumber = (s: string) => s.match(/^\W*p0*(\d+)(?!\d)/i)?.[1];
+
+// Plan files (p<N>_*.md) in plan order, each with its status from progress.md's Status table.
+export function planList(files: readonly string[], progress: string): string[] {
+  const status = new Map<string, string>();
+  for (const line of progress.split("\n")) {
+    const [plan, state] = line.split("|").slice(1, 3).map((c) => c.trim());
+    const n = plan && planNumber(plan);
+    if (n && state && !status.has(n)) status.set(n, state);
+  }
+  const plans = files.filter((f) => /^p\d+_.*\.md$/i.test(f)).sort((a, b) => Number(planNumber(a)) - Number(planNumber(b)) || a.localeCompare(b));
+  const width = Math.max(0, ...plans.map((f) => f.length));
+  return plans.map((f) => `${f.padEnd(width)}  ${status.get(planNumber(f)!) ?? "?"}`);
 }
 
 // shortcut: only looks one level down from cwd; recurse if sagas ever live deeper.
